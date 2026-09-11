@@ -87,7 +87,6 @@ async function loadAccounts() {
             $('acc-sel').addEventListener('change', e => state.accountId = e.target.value);
         }
 
-        // پیش‌پر کردن ایمیل از اسم اکانت (معمولاً "email's Account")
         const m = (accounts[0].name || '').match(/[\w.+-]+@[\w.-]+/);
         if (m && !$('email').value) $('email').value = m[0];
     } catch (e) {
@@ -141,31 +140,45 @@ document.querySelectorAll('.regen').forEach(btn => {
     $('log').innerHTML = '';
 
     try {
-        log('[1/6] Creating KV namespace…');
+        // ⚠️ چک overwrite — درس آموخته شده از تجربه‌ی واقعی 😄
+        log('[1/7] Checking existing workers…');
+        const scripts = await cf(`/accounts/${state.accountId}/workers/scripts`);
+        const conflict = scripts.some(s => s.id === name);
+        if (conflict && !confirm(
+            '⚠️ Worker «' + name + '» از قبل وجود داره!\n\n' +
+            'ادامه باعث بازنویسی (overwrite) کاملش می‌شه — ' +
+            'اگه این پنل فعلی توئه، credential ها و KV جدید جایگزین می‌شن!\n\n' +
+            'ادامه می‌دی؟'
+        )) {
+            throw new Error('لغو شد — یه اسم دیگه انتخاب کن');
+        }
+        log(conflict ? '      exists — user confirmed overwrite' : '      name is free');
+
+        log('[2/7] Creating KV namespace…');
         const kv = await cf(`/accounts/${state.accountId}/storage/kv/namespaces`, {
             method: 'POST',
             body: JSON.stringify({ title: 'flash-panel-kv' })
         });
         log(`      done — ${kv.id}`);
 
-        log('[2/6] Getting workers.dev subdomain…');
+        log('[3/7] Getting workers.dev subdomain…');
         const sub = await cf(`/accounts/${state.accountId}/workers/subdomain`);
         state.subdomain = sub.subdomain;
         settings.mainDomain = `${name}.${state.subdomain}.workers.dev`;
         log(`      ${settings.mainDomain}`);
 
-        log('[3/6] Downloading Flash Panel (latest release)…');
+        log('[4/7] Downloading Flash Panel (latest release)…');
         const src = await fetch(PANEL_RELEASE);
         if (!src.ok) throw new Error('دانلود سورس ناموفق — دوباره تلاش کن');
         const workerJs = await src.text();
         log(`      ${Math.round(workerJs.length / 1024)} KB`);
 
-        log('[4/6] Building final script…');
+        log('[5/7] Building final script…');
         const script =
             `Object.assign(globalThis, ${JSON.stringify({ EMBEDED_SETTINGS: settings })});\n` +
             workerJs;
 
-        log('[5/6] Uploading worker…');
+        log('[6/7] Uploading worker…');
         const metadata = {
             main_module: 'worker.js',
             compatibility_date: '2025-06-01',
@@ -178,7 +191,7 @@ document.querySelectorAll('.regen').forEach(btn => {
         await cf(`/accounts/${state.accountId}/workers/scripts/${name}`, { method: 'PUT', body: form });
         log('      deployed');
 
-        log('[6/6] Enabling workers.dev route…');
+        log('[7/7] Enabling workers.dev route…');
         await cf(`/accounts/${state.accountId}/workers/scripts/${name}/subdomain`, {
             method: 'PUT',
             body: JSON.stringify({ enabled: true })
