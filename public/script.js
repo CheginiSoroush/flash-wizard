@@ -1,6 +1,6 @@
 // ⚡ Flash Wizard — ۱۰۰% سمت مرورگر، بدون سرور
-const API = 'https://api.cloudflare.com/client/v4';
-const PANEL_RELEASE = 'https://github.com/CheginiSoroush/flash-panel/releases/latest/download/worker.js';
+const API = '/api';
+const PANEL_RELEASE = '/release';
 
 const state = { token: '', accountId: '', email: '', subdomain: '' };
 
