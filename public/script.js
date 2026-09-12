@@ -135,10 +135,6 @@ document.querySelectorAll('.regen').forEach(btn => {
  $('secpath').value = genPath();
 
  $('btn-deploy').addEventListener('click', async () => {
-    const name = $('wname').value.trim();
-    if (!/^[a-z0-9][a-z0-9-]{0,38}$/.test(name))
-        return msg('msg-3', 'نام worker فقط حروف کوچک انگلیسی، عدد و خط تیره');
-
     if (!state.zoneId)
         return msg('msg-3', 'اول دامنه‌ت رو به اکانت Cloudflare اضافه کن و صفحه رو رفرش کن');
 
@@ -146,6 +142,8 @@ document.querySelectorAll('.regen').forEach(btn => {
     if (!/^[a-z0-9]([a-z0-9-]{0,30})$/.test(prefix))
         return msg('msg-3', 'پیشوند زیردامنه فقط حروف کوچک، عدد و خط تیره');
 
+    // نام worker = برچسب اول دامنه (الگوی BPB — scriptName و mainDomain همخوان)
+    const name = prefix;
     const hostname = `${prefix}.${state.zoneName}`;
 
     const settings = {
@@ -187,11 +185,9 @@ document.querySelectorAll('.regen').forEach(btn => {
         });
         log(`      done — ${kv.id}`);
 
-        log('[3/8] Getting account subdomain…');
-        const sub = await cf(`/accounts/${state.accountId}/workers/subdomain`);
-        state.subdomain = sub.subdomain;
-        settings.mainDomain = `${name}.${state.subdomain}.workers.dev`;
-        log(`      internal name: ${settings.mainDomain}`);
+        log('[3/8] Panel domain…');
+        settings.mainDomain = hostname;
+        log(`      ${settings.mainDomain}`);
 
         log('[4/8] Downloading Flash Panel (latest release)…');
         const src = await fetch(PANEL_RELEASE);
