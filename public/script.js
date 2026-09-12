@@ -225,9 +225,9 @@ document.querySelectorAll('.regen').forEach(btn => {
         log(`      ${hostname} ✓`);
 
         log('[8/8] Disabling workers.dev route…');
-        await cf(`/accounts/${state.accountId}/workers/scripts/${name}/subdomain`, {
-            method: 'PUT',
-            body: JSON.stringify({ enabled: false })
+        await cf(`/accounts/${state.accountId}/workers/scripts/${name}/settings`, {
+            method: 'PATCH',
+            body: JSON.stringify({ workers_dev: false })
         });
         log('      ✓ — panel is ONLY on your domain');
 
