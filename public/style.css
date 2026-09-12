@@ -154,3 +154,20 @@ input[readonly] { opacity: 0.85; }
 }
 
 footer { margin-top: 2rem; text-align: center; color: var(--muted); font-size: 0.8rem; line-height: 1.8; }
+
+/* فیلد دامنه (select) */
+select {
+    background: rgba(8, 12, 24, 0.55);
+    border: 1px solid var(--border);
+    border-radius: 0.6rem;
+    color: var(--text);
+    padding: 0.7rem 0.9rem;
+    font-family: 'Vazirmatn', system-ui, sans-serif;
+    font-size: 0.9rem;
+    outline: none;
+    width: 100%;
+}
+
+.row select { flex: 1; }
+select:focus { border-color: var(--brand); }
+#zone-hint { font-size: 0.8rem; color: var(--muted); line-height: 1.8; margin-bottom: 0.75rem; }

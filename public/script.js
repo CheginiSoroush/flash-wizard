@@ -1,8 +1,8 @@
-// ⚡ Flash Wizard — ۱۰۰% سمت مرورگر، بدون سرور
+// ⚡ Flash Wizard — v2: استقرار روی دامنه‌ی سفارشی + خاموشی workers.dev
 const API = '/api';
 const PANEL_RELEASE = '/release';
 
-const state = { token: '', accountId: '', email: '', subdomain: '' };
+const state = { token: '', accountId: '', email: '', subdomain: '', zoneId: '', zoneName: '' };
 
 const $ = (id) => document.getElementById(id);
 const show = (id) => $(id).classList.remove('hidden');
@@ -32,7 +32,7 @@ async function cf(path, options = {}) {
             },
         });
     } catch {
-        throw new Error('ارتباط با Cloudflare برقرار نشد — اینترنت/فیلترشکنت رو چک کن');
+        throw new Error('ارتباط با ویزارد برقرار نشد — اتصالت رو چک کن');
     }
     const data = await res.json().catch(() => ({}));
     if (!data.success) {
@@ -69,7 +69,7 @@ const genPath = () => [...crypto.getRandomValues(new Uint8Array(6))]
     }
 });
 
-// ---------- گام ۲: اکانت ----------
+// ---------- گام ۲: اکانت + دامنه‌ها ----------
 async function loadAccounts() {
     show('step-2');
     $('accounts').textContent = 'در حال دریافت اکانت‌ها…';
@@ -85,6 +85,26 @@ async function loadAccounts() {
                 accounts.map(a => `<option value="${a.id}">${a.name}</option>`).join('') +
                 '</select>';
             $('acc-sel').addEventListener('change', e => state.accountId = e.target.value);
+        }
+
+        // دامنه‌های اکانت — استقرار امن روی دامنه‌ی خود کاربر
+        const zones = await cf('/zones?per_page=50');
+        const sel = $('zone-select');
+        if (!zones.length) {
+            sel.style.display = 'none';
+            $('zone-hint').innerHTML = '⚠️ هیچ دامنه‌ای توی این اکانت نیست.<br>' +
+                'اول دامنه‌ت رو از <a href="https://dash.cloudflare.com" target="_blank" rel="noopener">داشبورد Cloudflare</a> اضافه کن ' +
+                '(Add a domain — nameserver ها باید به Cloudflare اشاره کنن و وضعیتش Active بشه)، ' +
+                'بعد برگرد و این صفحه رو رفرش کن.';
+        } else {
+            sel.style.display = '';
+            sel.innerHTML = zones.map(z => `<option value="${z.id}">${z.name}</option>`).join('');
+            state.zoneId = zones[0].id;
+            state.zoneName = zones[0].name;
+            sel.onchange = () => {
+                state.zoneId = sel.value;
+                state.zoneName = sel.selectedOptions[0].textContent;
+            };
         }
 
         const m = (accounts[0].name || '').match(/[\w.+-]+@[\w.-]+/);
@@ -119,6 +139,15 @@ document.querySelectorAll('.regen').forEach(btn => {
     if (!/^[a-z0-9][a-z0-9-]{0,38}$/.test(name))
         return msg('msg-3', 'نام worker فقط حروف کوچک انگلیسی، عدد و خط تیره');
 
+    if (!state.zoneId)
+        return msg('msg-3', 'اول دامنه‌ت رو به اکانت Cloudflare اضافه کن و صفحه رو رفرش کن');
+
+    const prefix = ($('host-prefix').value.trim() || 'panel').toLowerCase();
+    if (!/^[a-z0-9]([a-z0-9-]{0,30})$/.test(prefix))
+        return msg('msg-3', 'پیشوند زیردامنه فقط حروف کوچک، عدد و خط تیره');
+
+    const hostname = `${prefix}.${state.zoneName}`;
+
     const settings = {
         accID: state.accountId,
         accEmail: state.email,
@@ -129,7 +158,7 @@ document.querySelectorAll('.regen').forEach(btn => {
         proxyIpMode: 'proxyip',
         proxyIPs: [],
         prefixes: [],
-        mainDomain: '',
+        mainDomain: '', // نام داخلی برای self-update — پر می‌شه در گام ۳
         fallback: 'www.speedtest.net',
         dohUrl: ''
     };
@@ -140,45 +169,42 @@ document.querySelectorAll('.regen').forEach(btn => {
     $('log').innerHTML = '';
 
     try {
-        // ⚠️ چک overwrite — درس آموخته شده از تجربه‌ی واقعی 😄
-        log('[1/7] Checking existing workers…');
+        log('[1/8] Checking existing workers…');
         const scripts = await cf(`/accounts/${state.accountId}/workers/scripts`);
         const conflict = scripts.some(s => s.id === name);
         if (conflict && !confirm(
             '⚠️ Worker «' + name + '» از قبل وجود داره!\n\n' +
-            'ادامه باعث بازنویسی (overwrite) کاملش می‌شه — ' +
-            'اگه این پنل فعلی توئه، credential ها و KV جدید جایگزین می‌شن!\n\n' +
-            'ادامه می‌دی؟'
+            'ادامه باعث بازنویسی (overwrite) کاملش می‌شه.\n\nادامه می‌دی؟'
         )) {
             throw new Error('لغو شد — یه اسم دیگه انتخاب کن');
         }
         log(conflict ? '      exists — user confirmed overwrite' : '      name is free');
 
-        log('[2/7] Creating KV namespace…');
+        log('[2/8] Creating KV namespace…');
         const kv = await cf(`/accounts/${state.accountId}/storage/kv/namespaces`, {
             method: 'POST',
             body: JSON.stringify({ title: 'flash-panel-kv' })
         });
         log(`      done — ${kv.id}`);
 
-        log('[3/7] Getting workers.dev subdomain…');
+        log('[3/8] Getting account subdomain…');
         const sub = await cf(`/accounts/${state.accountId}/workers/subdomain`);
         state.subdomain = sub.subdomain;
         settings.mainDomain = `${name}.${state.subdomain}.workers.dev`;
-        log(`      ${settings.mainDomain}`);
+        log(`      internal name: ${settings.mainDomain}`);
 
-        log('[4/7] Downloading Flash Panel (latest release)…');
+        log('[4/8] Downloading Flash Panel (latest release)…');
         const src = await fetch(PANEL_RELEASE);
         if (!src.ok) throw new Error('دانلود سورس ناموفق — دوباره تلاش کن');
         const workerJs = await src.text();
         log(`      ${Math.round(workerJs.length / 1024)} KB`);
 
-        log('[5/7] Building final script…');
+        log('[5/8] Building final script…');
         const script =
             `Object.assign(globalThis, ${JSON.stringify({ EMBEDED_SETTINGS: settings })});\n` +
             workerJs;
 
-        log('[6/7] Uploading worker…');
+        log('[6/8] Uploading worker…');
         const metadata = {
             main_module: 'worker.js',
             compatibility_date: '2025-06-01',
@@ -191,14 +217,21 @@ document.querySelectorAll('.regen').forEach(btn => {
         await cf(`/accounts/${state.accountId}/workers/scripts/${name}`, { method: 'PUT', body: form });
         log('      deployed');
 
-        log('[7/7] Enabling workers.dev route…');
+        log('[7/8] Attaching your domain…');
+        await cf(`/accounts/${state.accountId}/workers/domains`, {
+            method: 'PUT',
+            body: JSON.stringify({ hostname, service: name })
+        });
+        log(`      ${hostname} ✓`);
+
+        log('[8/8] Disabling workers.dev route…');
         await cf(`/accounts/${state.accountId}/workers/scripts/${name}/subdomain`, {
             method: 'PUT',
-            body: JSON.stringify({ enabled: true })
+            body: JSON.stringify({ enabled: false })
         });
-        log('      enabled');
+        log('      ✓ — panel is ONLY on your domain');
 
-        const url = `https://${settings.mainDomain}/${settings.securePath}/panel`;
+        const url = `https://${hostname}/${settings.securePath}/panel`;
         $('panel-url').href = url;
         $('panel-url').textContent = url;
         show('result');

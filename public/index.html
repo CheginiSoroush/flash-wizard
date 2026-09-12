@@ -45,6 +45,13 @@
 
     <section id="step-3" class="step hidden">
         <h2><span class="num">۳</span> تنظیمات پنل</h2>
+        <label class="field">دامنه‌ی پنل (امن — بدون workers.dev):
+            <div class="row">
+                <input id="host-prefix" dir="ltr" value="panel" style="max-width:110px">
+                <select id="zone-select" dir="ltr"></select>
+            </div>
+        </label>
+        <p id="zone-hint"></p>
         <label class="field">نام Worker:
             <input id="wname" dir="ltr" value="flash-panel">
         </label>
@@ -77,7 +84,7 @@
         </div>
         <div class="notice">
             <b>اولین ورود:</b> یوزرنیم = ایمیل اکانتت، و پسورد رو خودت موقع اولین ورود ست می‌کنی.<br>
-            بعد از ورود، از بخش «Get Config» کانفیگ‌ها رو بگیر.
+            بعد از ورود، از بخش «Get Config» کانفیگ‌ها رو بگیر.<br>✓ پنل فقط روی دامنه‌ی خودته — مسیر workers.dev غیرفعال شده.
         </div>
     </section>
 
