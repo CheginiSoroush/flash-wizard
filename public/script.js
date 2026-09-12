@@ -225,9 +225,11 @@ document.querySelectorAll('.regen').forEach(btn => {
         log(`      ${hostname} ✓`);
 
         log('[8/8] Disabling workers.dev route…');
+        const disableForm = new FormData();
+        disableForm.append('settings', new Blob([JSON.stringify({ workers_dev: false })], { type: 'application/json' }));
         await cf(`/accounts/${state.accountId}/workers/scripts/${name}/settings`, {
             method: 'PATCH',
-            body: JSON.stringify({ workers_dev: false })
+            body: disableForm
         });
         log('      ✓ — panel is ONLY on your domain');
 
